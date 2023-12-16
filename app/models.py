@@ -4,12 +4,6 @@ from app.database import Base
 from sqlalchemy.sql.expression import text
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 
-class Role(Base):
-    __tablename__ = "roles"
-    role_id = Column(Integer, nullable=False, primary_key=True)
-    role_name = Column(String, nullable=False)
-
-    users = relationship("User", back_populates="roles", uselist=True)
 
 class User(Base):
     __tablename__ = "users"
@@ -18,9 +12,7 @@ class User(Base):
     password = Column(String, nullable=False, unique=True)
     id = Column(Integer, nullable=False, primary_key=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
-    role_id = Column(Integer, ForeignKey("roles.role_id", ondelete="CASCADE"), nullable=False)
-
-    roles = relationship("Role", back_populates="users",  uselist=True)
+    role_name = Column(String, nullable=False)
 
     
 class Task(Base):

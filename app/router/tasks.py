@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app import schemas, models, oath2
-from typing import List, Optional
+from typing import List
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ def gettask(db: Session = Depends(get_db), limit: int = 10, skip: int = 0, searc
 
 
 @router.post("/createtasks", status_code=status.HTTP_200_OK)
-def create_task(task: schemas.Task, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_user)):
+def create_task(task: schemas.Task, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_normal_user)):
     new_tasks = models.Task(creator_id=current_user.id, **task.model_dump())
     db.add(new_tasks)
     db.commit()
@@ -23,7 +23,7 @@ def create_task(task: schemas.Task, db: Session = Depends(get_db), current_user:
 
 
 @router.put("/updatetask/{task_id}", status_code=status.HTTP_200_OK)
-def updatetasks(task_id: int, task_section: schemas.Task, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_user)):
+def updatetasks(task_id: int, task_section: schemas.Task, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_normal_user)):
     task_db = db.query(models.Task).filter(models.Task.task_id == task_id)
     task = task_db.first()
     if not task:
@@ -40,7 +40,7 @@ def updatetasks(task_id: int, task_section: schemas.Task, db: Session = Depends(
 
 
 @router.put("/tasks/{task_id}/assign", status_code=status.HTTP_200_OK)
-def assigntask(task_id: int, assign_id: schemas.Assign, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_user)):
+def assigntask(task_id: int, assign_id: schemas.Assign, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_admin_user)):
     task_db = db.query(models.Task).filter(models.Task.task_id == task_id).first()
     if not task_db:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -61,7 +61,7 @@ def assigntask(task_id: int, assign_id: schemas.Assign, db: Session = Depends(ge
 
 
 @router.delete("/task/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deletetask(task_id: int, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_user)):
+def deletetask(task_id: int, db: Session = Depends(get_db), current_user: int = Depends(oath2.get_current_normal_user)):
     tasks = db.query(models.Task).filter(models.Task.task_id == task_id).first()
     if not tasks:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,

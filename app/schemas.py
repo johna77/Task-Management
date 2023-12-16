@@ -2,16 +2,17 @@ from pydantic import BaseModel, EmailStr
 
 class TokenData(BaseModel):
     id: str
+    scopes: list[str] = []
 
 class UserCreate(BaseModel):
     username: EmailStr
     password: str
-    role_id: int
+    role_name: str
 
 class UserRegis(BaseModel):
     id: int
     username: EmailStr
-    role_id: int
+    role_name: str
 
 class Token(BaseModel):
     access_token: str

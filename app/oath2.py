@@ -1,15 +1,17 @@
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from app import schemas, database, models
-from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, SecurityScopes
+from fastapi import Depends, HTTPException, status, Security
 from sqlalchemy.orm import Session
+from typing import Annotated
 
 SECRET_KEY = ""
 ALGORITHM = ""
-ACCESS_TOKEN_EXPIRE_MINUTES = 10
+ACCESS_TOKEN_EXPIRE_MINUTES = 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", scopes={"admin": "Perform all tasks", "normal": "Perform tasks except admin"},
+)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -18,35 +20,46 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_access_token(token: str, credentials_exception):
+            
+def get_current_user(security_scopes: SecurityScopes, token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
+    print (security_scopes.scopes)
+    if security_scopes.scopes:
+        authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
+    else:
+        authenticate_value = "Bearer"
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": authenticate_value},
+    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         id = str(payload.get("user_id"))
         if id is None:
             raise credentials_exception
-        # user = db.query(models.Tokens).filter(models.Tokens.user_id == id).first()
-        # if not user or not user.is_active:
-        #     raise credentials_exception
-        token_data = schemas.TokenData(id=id)
+        token_scopes = payload.get("scopes", [])
+        token_data = schemas.TokenData(scopes=token_scopes, id=id)
     except JWTError:
         raise credentials_exception
-    return token_data
-            
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    token = verify_access_token(token, credentials_exception)
-    user = db.query(models.User).filter(models.User.id == token.id).first()
+    user = db.query(models.User).filter(models.User.id == token_data.id).first()
+    if user is None:
+        raise credentials_exception
+    for scope in security_scopes.scopes:
+        if scope not in token_data.scopes or scope != user.role_name:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not enough permissions",
+                headers={"WWW-Authenticate": authenticate_value},
+            )
     return user
 
 
-def get_user_role(user: schemas.UserRegis = Depends(get_current_user)):
-    return user.role_id
+async def get_current_admin_user(
+    current_user: Annotated[schemas.UserRegis, Security(get_current_user, scopes=["admin"])]
+):
+    return current_user
 
-def is_admin(user_role: int = Depends(get_user_role)):
-    if user_role != 1:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied, admin role required")
+async def get_current_normal_user(
+    current_user: Annotated[schemas.UserRegis, Security(get_current_user, scopes=["normal"])]
+):
+    return current_user
